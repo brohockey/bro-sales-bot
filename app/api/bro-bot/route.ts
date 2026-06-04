@@ -243,6 +243,86 @@ function getStickRecommendation(params: {
   };
 }
 
+async function upsertDraftLead(session: any, message: TelegramMessage, status = 'quiz_started') {
+  const recommendation =
+    session?.height_cm && session?.weight_kg
+      ? getStickRecommendation({
+          height_cm: session.height_cm,
+          weight_kg: session.weight_kg,
+          play_style: session.play_style,
+        })
+      : null;
+
+  const leadPayload = {
+    telegram_id: message.from.id,
+    username: message.from.username || null,
+    first_name: message.from.first_name || null,
+    last_name: message.from.last_name || null,
+
+    source: 'telegram_bot',
+    scenario: session?.scenario || 'unknown',
+
+    name: session?.name || message.from.first_name || null,
+    phone: session?.phone || null,
+
+    height_cm: session?.height_cm || null,
+    weight_kg: session?.weight_kg || null,
+    hand: session?.hand || null,
+    player_level: session?.player_level || null,
+    play_style: session?.play_style || null,
+    stick_type: session?.stick_type || null,
+
+    recommended_size: recommendation?.size || null,
+    recommended_length: recommendation?.length || null,
+    recommended_flex: recommendation?.flex || null,
+    recommended_curve: recommendation?.curve || null,
+    recommended_kick: recommendation?.kick || null,
+    recommended_model: recommendation?.model || null,
+    estimated_price: recommendation?.estimatedPrice || null,
+
+    status,
+    next_action:
+      status === 'completed'
+        ? 'Связаться с клиентом'
+        : 'Дождаться завершения опроса',
+    comment: session?.comment || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (session?.lead_id) {
+    const { data, error } = await supabaseAdmin
+      .from('bro_leads')
+      .update(leadPayload)
+      .eq('id', session.lead_id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('upsertDraftLead update error:', JSON.stringify(error, null, 2));
+      return null;
+    }
+
+    return data;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('bro_leads')
+    .insert(leadPayload)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('upsertDraftLead insert error:', JSON.stringify(error, null, 2));
+    return null;
+  }
+
+  await updateSession(message.from.id, {
+    lead_id: data.id,
+  });
+
+  return data;
+}
+
 async function createLeadFromSession(session: any, message: TelegramMessage) {
   const recommendation = getStickRecommendation({
     height_cm: session?.height_cm,
@@ -355,20 +435,22 @@ async function handleStart(message: TelegramMessage) {
 async function handleMainMenu(message: TelegramMessage, text: string) {
   const normalizedText = text.replace(/\s+/g, ' ').trim();
 
-  if (normalizedText === '🏒 Подобрать клюшку') {
-    await updateSession(message.from.id, {
-      step: 'height',
-      scenario: 'stick_selection',
-    });
+  if (normalizedText.includes('подобрать')) {
+  const session = await updateSession(message.from.id, {
+    step: 'height',
+    scenario: 'stick_selection',
+  });
 
-    await sendMessage(
-      message.chat.id,
-      'Отлично. Начнём подбор клюшки.\n\nУкажите ваш рост в сантиметрах, например: 180',
-      removeKeyboard()
-    );
+  await upsertDraftLead(session, message, 'quiz_started');
 
-    return;
-  }
+  await sendMessage(
+    message.chat.id,
+    'Отлично. Начнём подбор клюшки.\n\nУкажите ваш рост в сантиметрах, например: 180',
+    removeKeyboard()
+  );
+
+  return;
+}
 
   if (normalizedText === '🧩 Кастомная клюшка') {
     await updateSession(message.from.id, {
@@ -483,12 +565,14 @@ async function handleDialog(message: TelegramMessage) {
     return;
   }
 
-  if (normalizedText?.includes('кастом')) {
-    await updateSession(message.from.id, {
-      step: 'height',
-      scenario: 'custom_stick',
-      stick_type: 'custom',
-    });
+  if (normalizedText.includes('кастом')) {
+  const session = await updateSession(message.from.id, {
+    step: 'height',
+    scenario: 'custom_stick',
+    stick_type: 'custom',
+  });
+
+  await upsertDraftLead(session, message, 'quiz_started');
 
     await sendMessage(
       message.chat.id,
@@ -565,7 +649,18 @@ async function handleDialog(message: TelegramMessage) {
     });
 
     const updatedSession = await getSession(message.from.id);
-    const result = await createLeadFromSession(updatedSession, message);
+const lead = await upsertDraftLead(updatedSession, message, 'completed');
+
+const result = lead
+  ? {
+      lead,
+      recommendation: getStickRecommendation({
+        height_cm: updatedSession?.height_cm,
+        weight_kg: updatedSession?.weight_kg,
+        play_style: updatedSession?.play_style,
+      }),
+    }
+  : null;
 
     await sendMessage(
       message.chat.id,
@@ -618,13 +713,15 @@ async function handleDialog(message: TelegramMessage) {
         return;
       }
 
-      await updateSession(message.from.id, {
-        height_cm: height,
-        step: 'weight',
-      });
+      const updatedSession = await updateSession(message.from.id, {
+  height_cm: height,
+  step: 'weight',
+});
 
-      await sendMessage(message.chat.id, 'Теперь укажите вес в кг, например: 78');
-      return;
+await upsertDraftLead(updatedSession, message, 'quiz_started');
+
+await sendMessage(message.chat.id, 'Теперь укажите вес в кг, например: 78');
+return;
     }
 
     case 'weight': {
@@ -635,17 +732,19 @@ async function handleDialog(message: TelegramMessage) {
         return;
       }
 
-      await updateSession(message.from.id, {
-        weight_kg: weight,
-        step: 'hand',
-      });
+      const updatedSession = await updateSession(message.from.id, {
+  weight_kg: weight,
+  step: 'hand',
+});
 
-      await sendMessage(
-        message.chat.id,
-        'Какой у вас хват?',
-        keyboard([['Левый'], ['Правый']])
-      );
-      return;
+await upsertDraftLead(updatedSession, message, 'quiz_started');
+
+await sendMessage(
+  message.chat.id,
+  'Какой у вас хват?',
+  keyboard([['Левый'], ['Правый']])
+);
+return;
     }
 
     case 'hand': {
@@ -654,10 +753,12 @@ async function handleDialog(message: TelegramMessage) {
         return;
       }
 
-      await updateSession(message.from.id, {
-        hand: text,
-        step: 'player_level',
-      });
+      const updatedSession = await updateSession(message.from.id, {
+  hand: text,
+  step: 'player_level',
+});
+
+await upsertDraftLead(updatedSession, message, 'quiz_started');
 
       await sendMessage(
         message.chat.id,
@@ -673,10 +774,12 @@ async function handleDialog(message: TelegramMessage) {
     }
 
     case 'player_level': {
-      await updateSession(message.from.id, {
-        player_level: text,
-        step: 'play_style',
-      });
+      const updatedSession = await updateSession(message.from.id, {
+  player_level: text,
+  step: 'play_style',
+});
+
+await upsertDraftLead(updatedSession, message, 'quiz_started');
 
       await sendMessage(
         message.chat.id,
@@ -706,12 +809,12 @@ async function handleDialog(message: TelegramMessage) {
         return;
       }
 
-      await updateSession(message.from.id, {
-        play_style: text,
-        step: 'phone',
-      });
+      const updatedSession = await updateSession(message.from.id, {
+  play_style: text,
+  step: 'phone',
+});
 
-      const updatedSession = await getSession(message.from.id);
+await upsertDraftLead(updatedSession, message, 'recommendation_shown');
       const recommendation = getStickRecommendation({
         height_cm: updatedSession?.height_cm,
         weight_kg: updatedSession?.weight_kg,
@@ -741,7 +844,17 @@ async function handleDialog(message: TelegramMessage) {
 
     case 'phone': {
       if (text === 'Пропустить') {
-        const result = await createLeadFromSession(session, message);
+        const lead = await upsertDraftLead(session, message, 'completed');
+const result = lead
+  ? {
+      lead,
+      recommendation: getStickRecommendation({
+        height_cm: session?.height_cm,
+        weight_kg: session?.weight_kg,
+        play_style: session?.play_style,
+      }),
+    }
+  : null;
 
         await sendMessage(
           message.chat.id,
@@ -770,7 +883,18 @@ async function handleDialog(message: TelegramMessage) {
       });
 
       const updatedSession = await getSession(message.from.id);
-      const result = await createLeadFromSession(updatedSession, message);
+const lead = await upsertDraftLead(updatedSession, message, 'completed');
+
+const result = lead
+  ? {
+      lead,
+      recommendation: getStickRecommendation({
+        height_cm: updatedSession?.height_cm,
+        weight_kg: updatedSession?.weight_kg,
+        play_style: updatedSession?.play_style,
+      }),
+    }
+  : null;
 
       await sendMessage(
         message.chat.id,
