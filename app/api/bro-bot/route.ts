@@ -537,9 +537,9 @@ async function handleMainMenu(message: TelegramMessage, text: string) {
 }
 
 async function handleDialog(message: TelegramMessage) {
-  const text = message.text?.trim();
+  const text = message.text?.trim() || '';
   const normalizedText = text
-    ?.replace(/\s+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
 
@@ -550,7 +550,7 @@ async function handleDialog(message: TelegramMessage) {
     return;
   }
 
-  if (normalizedText?.includes('подобрать')) {
+  if (normalizedText.includes('подобрать')) {
     await updateSession(message.from.id, {
       step: 'height',
       scenario: 'stick_selection',
@@ -587,7 +587,7 @@ async function handleDialog(message: TelegramMessage) {
     return;
   }
 
-  if (normalizedText?.includes('наличие')) {
+  if (normalizedText.includes('наличие')) {
     await updateSession(message.from.id, {
       step: 'inventory_interest',
       scenario: 'inventory',
@@ -608,7 +608,7 @@ async function handleDialog(message: TelegramMessage) {
     return;
   }
 
-  if (normalizedText?.includes('командный') || normalizedText?.includes('оптовый')) {
+  if (normalizedText.includes('командный') || normalizedText.includes('оптовый')) {
     await updateSession(message.from.id, {
       step: 'team_order_name',
       scenario: 'team_order',
@@ -623,7 +623,7 @@ async function handleDialog(message: TelegramMessage) {
     return;
   }
 
-  if (normalizedText?.includes('связаться') || normalizedText?.includes('менеджер')) {
+  if (normalizedText.includes('связаться') || normalizedText.includes('менеджер')) {
     await updateSession(message.from.id, {
       step: 'phone',
       scenario: 'manager_contact',
