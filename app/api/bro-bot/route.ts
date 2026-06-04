@@ -348,7 +348,9 @@ async function handleStart(message: TelegramMessage) {
 }
 
 async function handleMainMenu(message: TelegramMessage, text: string) {
-  if (text === '🏒 Подобрать клюшку') {
+  const normalizedText = text.replace(/\s+/g, ' ').trim();
+
+  if (normalizedText === '🏒 Подобрать клюшку') {
     await updateSession(message.from.id, {
       step: 'height',
       scenario: 'stick_selection',
@@ -363,7 +365,7 @@ async function handleMainMenu(message: TelegramMessage, text: string) {
     return;
   }
 
-  if (text === '🧩 Кастомная клюшка') {
+  if (normalizedText === '🧩 Кастомная клюшка') {
     await updateSession(message.from.id, {
       step: 'height',
       scenario: 'custom_stick',
@@ -383,7 +385,7 @@ async function handleMainMenu(message: TelegramMessage, text: string) {
     return;
   }
 
-  if (text === '📦 Узнать наличие') {
+  if (normalizedText === '📦 Узнать наличие') {
     await updateSession(message.from.id, {
       step: 'inventory_interest',
       scenario: 'inventory',
@@ -404,7 +406,7 @@ async function handleMainMenu(message: TelegramMessage, text: string) {
     return;
   }
 
-  if (text === '👥 Командный / оптовый заказ') {
+  if (normalizedText === '👥 Командный / оптовый заказ') {
     await updateSession(message.from.id, {
       step: 'team_order_name',
       scenario: 'team_order',
@@ -419,7 +421,7 @@ async function handleMainMenu(message: TelegramMessage, text: string) {
     return;
   }
 
-  if (text === '☎️ Связаться с менеджером') {
+  if (normalizedText === '☎️ Связаться с менеджером') {
     await updateSession(message.from.id, {
       step: 'phone',
       scenario: 'manager_contact',
