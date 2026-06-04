@@ -451,14 +451,105 @@ async function handleMainMenu(message: TelegramMessage, text: string) {
 
 async function handleDialog(message: TelegramMessage) {
   const text = message.text?.trim();
+  const normalizedText = text
+    ?.replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
   const session = await getSession(message.from.id);
 
-  if (!session) {
+  if (text === 'Назад' || text === '/start') {
     await handleStart(message);
     return;
   }
 
-  if (text === 'Назад' || text === '/start') {
+  if (normalizedText?.includes('подобрать')) {
+    await updateSession(message.from.id, {
+      step: 'height',
+      scenario: 'stick_selection',
+    });
+
+    await sendMessage(
+      message.chat.id,
+      'Отлично. Начнём подбор клюшки.\n\nУкажите ваш рост в сантиметрах, например: 180',
+      removeKeyboard()
+    );
+
+    return;
+  }
+
+  if (normalizedText?.includes('кастом')) {
+    await updateSession(message.from.id, {
+      step: 'height',
+      scenario: 'custom_stick',
+      stick_type: 'custom',
+    });
+
+    await sendMessage(
+      message.chat.id,
+      [
+        'Кастомная клюшка BRO собирается под ваши параметры: длина, flex, загиб, вес, дизайн и надпись.',
+        '',
+        'Для начала укажите ваш рост в сантиметрах, например: 180',
+      ].join('\n'),
+      removeKeyboard()
+    );
+
+    return;
+  }
+
+  if (normalizedText?.includes('наличие')) {
+    await updateSession(message.from.id, {
+      step: 'inventory_interest',
+      scenario: 'inventory',
+    });
+
+    await sendMessage(
+      message.chat.id,
+      'Какая клюшка интересует?',
+      keyboard([
+        ['Детская'],
+        ['Подростковая'],
+        ['Взрослая'],
+        ['Кастомная'],
+        ['Назад'],
+      ])
+    );
+
+    return;
+  }
+
+  if (normalizedText?.includes('командный') || normalizedText?.includes('оптовый')) {
+    await updateSession(message.from.id, {
+      step: 'team_order_name',
+      scenario: 'team_order',
+    });
+
+    await sendMessage(
+      message.chat.id,
+      'Напишите название команды/клуба и примерное количество клюшек.',
+      removeKeyboard()
+    );
+
+    return;
+  }
+
+  if (normalizedText?.includes('связаться') || normalizedText?.includes('менеджер')) {
+    await updateSession(message.from.id, {
+      step: 'phone',
+      scenario: 'manager_contact',
+    });
+
+    await sendMessage(
+      message.chat.id,
+      'Оставьте номер телефона, и мы свяжемся с вами.',
+      contactKeyboard()
+    );
+
+    return;
+  }
+
+  if (!session) {
     await handleStart(message);
     return;
   }
