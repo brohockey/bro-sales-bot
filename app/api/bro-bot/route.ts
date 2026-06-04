@@ -93,11 +93,16 @@ async function getSession(telegramId: number) {
 async function updateSession(telegramId: number, updates: Record<string, unknown>) {
   const { data, error } = await supabaseAdmin
     .from('bro_bot_sessions')
-    .upsert({
-      telegram_id: telegramId,
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
+    .upsert(
+      {
+        telegram_id: telegramId,
+        ...updates,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: 'telegram_id',
+      }
+    )
     .select()
     .single();
 
